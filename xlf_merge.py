@@ -300,7 +300,7 @@ def main(args = sys.argv[1:]):
     input_files = []
     output_file = None
 
-    print("XLF merge tool v0.1 (c) 2023 by Alexandr A. Telyatnikov aka Alter")
+    print("XLF merge tool v0.2 (c) 2023 by Alexandr A. Telyatnikov aka Alter")
     
     # Parse command line arguments
     args = sys.argv[1:]
