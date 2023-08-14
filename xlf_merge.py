@@ -70,6 +70,7 @@ def extract_opening_tag(xml_string):
 
 class XLFParser:
     def __init__(self, filename, keep_first=True):
+        global bVerbose
         with open(filename, 'r', encoding='utf-8') as file:
             content = file.read()
             #self.root = ET.fromstring(content)
@@ -294,6 +295,7 @@ def merge_files(input_files, output_file, keep_first=True):
 
 def main(args = sys.argv[1:]):
     global bKeepFirst
+    global bVerbose
 
     input_files = []
     output_file = None
