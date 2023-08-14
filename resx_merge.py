@@ -138,7 +138,7 @@ class RESXParser:
         #end for()
     #end merge()
 
-    def save_to_resx(self, filename):
+    def save_merged(self, filename):
         with open(filename, 'w', encoding='utf-8') as file:
             # Write raw header
             file.write(self.raw_header + "\n")
@@ -160,7 +160,7 @@ class RESXParser:
             # Write raw tail
             file.write(self.raw_tail)
 
-    #end save_to_resx()
+    #end save_merged()
 
 #end class RESXParser
 
@@ -202,7 +202,7 @@ def merge_files(input_files, output_file, keep_first=True):
 
     if(output_file != None and merged_file != None):
         try:
-            merged_file.save_to_resx(output_file)
+            merged_file.save_merged(output_file)
             return True
         except Exception as e:
             print('Save error:', str(e))
