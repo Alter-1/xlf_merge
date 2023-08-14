@@ -8,15 +8,13 @@ automatically merges XLF and RESX translation files. There are two operation mod
 Merged file will have the same name and will be placed in directory specified by -o 
 
 If more than one record with the same ID is found, xlf_merge takes into account translation state (see Merge priority below) and use record with highest priority. If records have same priority, the 1st is used unless -f is specified.
-Since .resx files has no state records, only firsr/last policy can be applied
+Since .resx files has no state records, only first/last policy can be applied
 
 ## Usage:
 ```
   xlf_merge.py [<options>] -i <xlf1> -i <xlf2> [ -i <xlf3> ....] -o <xlf_merged>
+  xlf_merge.py [<options>] -i <resx1> -i <resx2> [ -i <resx3> ....] -o <resx_merged>
   xlf_merge.py [<options>] -i <dir11> -i <dir2> -o <dir_merged>
-
-  resx_merge.py [<options>] -i <xlf1> -i <xlf2> [ -i <xlf3> ....] -o <xlf_merged>
-  resx_merge.py [<options>] -i <dir11> -i <dir2> -o <dir_merged>
 ```
 
 Options:

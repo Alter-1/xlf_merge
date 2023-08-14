@@ -244,10 +244,132 @@ class XLFParser:
 
 #end class XLFParser
 
+class RESXParser:
+    def __init__(self, filename, keep_first=True):
+        global bVerbose
+        with open(filename, 'r', encoding='utf-8') as file:
+            content = file.read()
+            #self.root = ET.fromstring(content)
+            
+            # Extract raw header and tail
+            #start_index = content.index('<data')
+            start_index = content.rindex('</resheader>') + len('</resheader>')
+            start_index = content.index('<data', start_index)
+            end_index = content.rindex('</data>') + len('</data>')
+            self.raw_header = content[:start_index].strip()
+            self.raw_tail = content[end_index:].strip()
+
+            # Extract only the trans-unit elements for parsing
+            data_units_content = content[start_index:end_index]
+            #root = ET.fromstring("<root>" + data_units_content + "</root>")  # Wrap in a root for parsing
+            root = etree.fromstring("<root>" + data_units_content + "</root>")  # Wrap in a root for parsing
+             
+            self.data_unit_ids = []
+            self.raw_id_str = {}
+            self.name_to_value = {}
+            self.dup_count = 0
+            self.new_count = 0
+
+            #for data_unit in root.findall(".//trans-unit"):
+            for data_unit in root.findall("data"):
+                                
+                raw_id_str_open = extract_opening_tag(etree.tostring(data_unit, encoding="unicode").strip())
+                value_element = data_unit.find("value")
+                id_str = data_unit.attrib['name']
+                #print(id_str)
+
+                # Handle duplicates based on keep_first flag
+                #if id in self.name_to_value:
+                if id_str in self.name_to_value:
+                    self.dup_count += 1
+
+                    if(bVerbose):
+                        print("Dup: "+data_unit.attrib['name'])
+
+                    if keep_first:
+                        continue
+
+                if value_element is not None:
+                    self.data_unit_ids.append(id_str)
+                    self.raw_id_str[id_str] = raw_id_str_open
+                    #self.name_to_value[id_str] = value_element.text
+                    self.name_to_value[id_str] = etree.tostring(value_element, encoding="unicode")
+                #end if()
+            #end for()
+
+    #end __init__()
+
+    def merge(self, other, keep_first=True):
+
+        # Go through items of the second object
+        for idx, id_str in enumerate(other.name_to_value):
+
+            raw_id_str_open = other.raw_id_str[id_str] #extract_opening_tag(etree.tostring(data_unit, encoding="unicode").strip())
+            value = other.name_to_value[id_str]
+            
+            # If the name is not in the first object, insert after the same preceding item
+            #if source not in self.name_to_value:
+            if id_str not in self.name_to_value:
+                self.new_count += 1
+                if idx == 0:
+                    # If it's the first item, prepend to the list
+                    self.data_unit_ids.insert(0, id_str)
+                else:
+                    # Find the preceding item from the other object in the first object
+                    prev_id = other.data_unit_ids[idx - 1]
+                    if prev_id in self.data_unit_ids:
+                        insert_pos = self.data_unit_ids.index(prev_id) + 1
+                        self.data_unit_ids.insert(insert_pos, id_str)
+                    else:
+                        # If the preceding source isn't found (unlikely), append to the end
+                        self.data_unit_ids.append(id_str)
+
+                self.raw_id_str[id_str] = raw_id_str_open
+                self.name_to_value[id_str] = value
+            else:
+                # If the source exists in the first object, compare states and update if needed
+                
+                if(not keep_first):
+                    self.name_to_value[id_str] = value
+                    self.raw_id_str[id_str] = raw_id_str_open
+            #end if(source not in self.name_to_value)
+
+        #end for()
+    #end merge()
+
+    def save_merged(self, filename):
+        with open(filename, 'w', encoding='utf-8') as file:
+            # Write raw header
+            file.write(self.raw_header + "\n")
+            
+            # Write each trans-unit in the current order
+            for id_str in self.data_unit_ids:
+
+                raw_id_str = self.raw_id_str[id_str]
+                value = self.name_to_value[id_str]
+
+                # Format and write trans-unit item
+                #data_unit_content  = f'        <trans-unit id="{id_str}" translate="yes" xml:space="preserve">\n'
+                data_unit_content =  f'        '+raw_id_str+'\n'
+                data_unit_content += '          '+expand_self_closing_tags(value.strip())+'\n'
+                data_unit_content += '        </data>\n'
+
+                file.write(data_unit_content)
+            
+            # Write raw tail
+            file.write(self.raw_tail)
+
+    #end save_merged()
+
+#end class RESXParser
+
 def print_help():
     print("  https://alter.org.ua/soft/other/xlf_merge")
     print("Usage:")
     print("  python xlf_merge.py [<options>] -i <xlf1> -i <xlf2> [ -i <xlf3> ....] -o <xlf_merged>")
+    print("  python xlf_merge.py [<options>] -i <dir11> -i <dir2> -o <dir_merged>")
+    print("    or")
+    print("  python xlf_merge.py [<options>] -i <resx1> -i <resx2> [ -i <resx3> ....] -o <resx_merged>")
     print("  python xlf_merge.py [<options>] -i <dir11> -i <dir2> -o <dir_merged>")
     print("Options:")
     print("  -v    verbose")
@@ -264,13 +386,19 @@ def merge_files(input_files, output_file, keep_first=True):
 
         if(merged_file == None):
             try:
-                merged_file = XLFParser(fn, keep_first)
+                if(fn.endswith("xlf")):
+                    merged_file = XLFParser(fn, keep_first)
+                if(fn.endswith("resx")):
+                    merged_file = RESXParser(fn, keep_first)
                 print(fn+": dups: "+str(merged_file.dup_count))
             except Exception as e:
                 print('Merge error:', str(e))
         else:
             try:
-                input_file = XLFParser(fn, keep_first)
+                if(fn.endswith("xlf")):
+                    input_file = XLFParser(fn, keep_first)
+                if(fn.endswith("resx")):
+                    input_file = RESXParser(fn, keep_first)
                 print(fn+": dups: "+str(input_file.dup_count))
                 merged_file.merge(input_file, keep_first)
                 print("  new: "+str(merged_file.new_count))
@@ -340,11 +468,10 @@ def main(args = sys.argv[1:]):
 
         files = os.listdir(src_dir1)
         for fn in files:
-            if(not fn.endswith(".xlf")):
-                continue
-            merge_files([os.path.join(src_dir1, fn), os.path.join(src_dir2, fn)], 
-                         os.path.join(dst_dir, fn),
-                         bKeepFirst )
+            if(fn.endswith(".xlf") or fn.endswith(".resx")):
+                merge_files([os.path.join(src_dir1, fn), os.path.join(src_dir2, fn)], 
+                             os.path.join(dst_dir, fn),
+                             bKeepFirst )
         #end for()
     else:
         merge_files(input_files, output_file, bKeepFirst)
